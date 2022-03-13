@@ -16,15 +16,12 @@ test = r.Reconnection(psi_0, j_0, eta, nu)
 
 # ---------------------------
 
-Niter = 2001
-dt = 1e-2
+Niter = 5000
+dt = 1e-1
 
 test.run(Niter, 1e-2)
 
 # ---------------------------
-
-print(test.psi_hist[:,:,0])
-print(test.psi_hist[:,:,Niter-1])
 
 test.plot_psi_center()
 test.plot_phi_sheet()

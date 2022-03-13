@@ -66,8 +66,7 @@ class Reconnection:
 
         CPhiPsi = calc.CrochetPoisson(phi, psi, self.dx, self.dy)
         CPhiomega = calc.CrochetPoisson(phi, omega, self.dx, self.dy)
-        CPsij = calc.CrochetPoisson(
-            self.psi_0, dj, self.dx, self.dy) + calc.CrochetPoisson(dpsi, self.j_0, self.dx, self.dy) + calc.CrochetPoisson(dpsi, dj, self.dx, self.dy)
+        CPsij = calc.CrochetPoisson(self.psi_0, dj, self.dx, self.dy) + calc.CrochetPoisson(dpsi, self.j_0, self.dx, self.dy) + calc.CrochetPoisson(dpsi, dj, self.dx, self.dy)
 
         F_new[:, :, 0] = -CPhiPsi + self.eta * dj[1:-1, 1:-1]
         F_new[:, :, 1] = -CPhiomega + CPsij + self.nu * calc.Lap(omega, self.dx, self.dy)
@@ -106,25 +105,22 @@ class Reconnection:
         start_time = time.time()
 
         self.t = np.zeros(Niter)
-        psi_hist = np.zeros((self.nx, self.ny, Niter))
+        self.psi_hist = np.zeros((self.nx, self.ny, Niter))
         A = 1e-7
         dPsi = A*np.cos(2*np.pi*self.X)
-        psi_hist[:, :, 0] = (self.psi_0 + dPsi)[1:-1, 1:-1]
+        self.psi_hist[:, :, 0] = (self.psi_0 + dPsi)[1:-1, 1:-1]
 
-        omega_hist = np.zeros((self.nx, self.ny, Niter))
+        self.omega_hist = np.zeros((self.nx, self.ny, Niter))
  
         for i in range(Niter-1):
             cur = np.zeros((self.nx, self.ny, 2))
-            cur[:, :, 0] = psi_hist[:, :, i]
-            cur[:, :, 1] = omega_hist[:, :, i]
+            cur[:, :, 0] = self.psi_hist[:, :, i]
+            cur[:, :, 1] = self.omega_hist[:, :, i]
 
             new_x = self.RKTimeStep(cur, dt)
             self.t[i+1] = self.t[i]+dt
-            psi_hist[:, :, i+1] = new_x[:, :, 0]
-            omega_hist[:, :, i+1] = new_x[:, :, 1]
-        
-        self.omega_hist = omega_hist
-        self.psi_hist = psi_hist
+            self.psi_hist[:, :, i+1] = new_x[:, :, 0]
+            self.omega_hist[:, :, i+1] = new_x[:, :, 1]
 
         print('run() done, %0.3f' % (time.time() - start_time), 's')
 
@@ -196,7 +192,7 @@ class Reconnection:
         axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
         bnext = Button(axnext, 'Next')
         bnext.on_clicked(callback.next)
-        bprev = Button(axprev, 'Previous')
+        bprev = Button(axprev, 'Prev')
         bprev.on_clicked(callback.prev)
 
         plt.show()
@@ -251,7 +247,7 @@ class Reconnection:
         axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
         bnext = Button(axnext, 'Next')
         bnext.on_clicked(callback.next)
-        bprev = Button(axprev, 'Previous')
+        bprev = Button(axprev, 'Prev')
         bprev.on_clicked(callback.prev)
 
         plt.show()
