@@ -18,7 +18,7 @@ test = r.Reconnection(psi_0, j_0, eta, nu)
 
 # ---------------------------
 
-Niter = 500
+Niter = 1000
 dt = 1e-1
 
 # ---------------------------
@@ -28,4 +28,4 @@ test.plot_dpsi_center()
 test.plot_sheet()
 print(test.linfit_dpsi_center())
 
-
+print('test')
