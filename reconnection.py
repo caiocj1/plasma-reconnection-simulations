@@ -1,13 +1,14 @@
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from matplotlib.widgets import Button
+import scipy.stats
 import time
 import numpy as np
 import calc
 import bc
 
-
 class Reconnection:
+
+    # ----- Modelling and running simulations ----- #
 
     def __init__(self, psi_0: np.ndarray, j_0: np.ndarray, eta: float, nu: float) -> None:
         """
@@ -124,129 +125,126 @@ class Reconnection:
 
         print('run() done, %0.3f' % (time.time() - start_time), 's')
 
-    def plot_psi_center(self) -> None:
+    # ----- Displaying results, post-treatment methods ----- #
+
+    def plot_dpsi_center(self) -> None:
         """
         Plot evolution of psi in center of current sheet
         """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
         Niter = self.t.shape[0]
+        dt = self.t[1] - self.t[0]
         dpsi = np.zeros(Niter)
         for i in range(Niter):
             dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
         plt.figure(1)
         plt.clf()
+        ax = plt.axes()
+        ax.cla()
+        ax.set_xlabel('t')
+        ax.set_ylabel('$\log \Delta \psi$')
         plt.semilogy(self.t, np.abs(dpsi), lw=2)
-        plt.show()
+        plt.savefig(f'results/{self.nx}x{self.ny}_eta{self.eta}_nu{self.nu}_{Niter}_dt{dt}.png')
+
+    def linfit_dpsi_center(self) -> float:
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+        Niter = self.t.shape[0]
+        dpsi = np.zeros(Niter)
+        for i in range(Niter):
+            dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
+
+        divs = 8
+        res = []
+        for i in range(divs):
+            slope, intercept, r, p, se = scipy.stats.linregress(self.t[(i*Niter//divs):((i+1)*Niter//divs)], np.log10(dpsi)[(i*Niter//divs):((i+1)*Niter//divs)])
+            res.append((slope, se))
+
+        slp = 0
+        count = 0
+        for pair in res:
+            if pair[1] < 1e-4:
+                slp += pair[0]
+                count += 1
+
+        return slp/count
         
-    def plot_phi_sheet(self) -> None:
+    def plot_sheet(self) -> None:
         """
-        Plot evolution of phi in whole current sheet
+        Plot contour levels of phi and psi across current sheet
         """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
         Niter = self.t.shape[0]
 
         omega_hist = self.omega_hist
+        psi_hist, psi_0 = self.psi_hist, self.psi_0
         dx, dy, X, Y = self.dx, self.dy, self.X, self.Y
         t = self.t
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(1, 2)
         fig.subplots_adjust(bottom=0.2)
-        omega = bc.bc_omega_zero(omega_hist[:, :, 0])
-        phi = calc.LapInv(omega, self.dx, self.dy)
+        fig.set_size_inches(13,6)
 
-        ax.contourf(self.X,self.Y,phi,20,cmap=plt.get_cmap('coolwarm'))
-        ax.contour(self.X,self.Y,phi,20,colors='k',alpha=0.2)
-        ax.set_title('t = %0.3f' % self.t[0])
+        def update(i):
+            ax[0].cla()
+            ax[1].cla()
+
+            omega = bc.bc_omega_zero(omega_hist[:, :, i])
+            phi = calc.LapInv(omega, dx, dy)
+            psi = bc.bc_psi_const(psi_hist[:, :, i], psi_0)
+
+            ax[0].contourf(X,Y,phi,20,cmap=plt.get_cmap('coolwarm'))
+            ax[0].contour(X,Y,phi,20,colors='k',alpha=0.2)
+            ax[0].set_title(r'$\phi$, t = %0.3f' % t[i])
+
+            ax[1].contourf(X,Y,psi,20,cmap=plt.get_cmap('coolwarm'))
+            ax[1].contour(X,Y,psi,20,colors='k',alpha=0.2)
+            ax[1].set_title(r'$\psi$, t = %0.3f' % t[i])
+
+        update(0)
 
         class Index():
             ind = 0
 
+            def zero(self, event):
+                self.ind = 0
+                update(0)
+                plt.draw()
+            
+            def mid(self, event):
+                self.ind = Niter//2
+                update(self.ind)
+                plt.draw()
+
             def next(self, event):
                 self.ind += 1
                 i = self.ind % Niter
-                ax.cla()
-                omega = bc.bc_omega_zero(omega_hist[:, :, i])
-                phi = calc.LapInv(omega, dx, dy)
-
-                ax.contourf(X,Y,phi,20,cmap=plt.get_cmap('coolwarm'))
-                ax.contour(X,Y,phi,20,colors='k',alpha=0.2)
-                ax.set_title('t = %0.3f' % t[i])
+                update(i)
                 plt.draw()
 
             def prev(self, event):
                 self.ind -= 1
                 i = self.ind % Niter
-                ax.cla()
-                omega = bc.bc_omega_zero(omega_hist[:, :, i])
-                phi = calc.LapInv(omega, dx, dy)
-
-                ax.contourf(X,Y,phi,20,cmap=plt.get_cmap('coolwarm'))
-                ax.contour(X,Y,phi,20,colors='k',alpha=0.2)
-                ax.set_title('t = %0.3f' % t[i])
+                update(i)
                 plt.draw()
 
         callback = Index()
-        axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
+        axprev = fig.add_axes([0.70, 0.05, 0.1, 0.075])
         axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
+        axmidp = fig.add_axes([0.09, 0.05, 0.1, 0.075])
+        axzero = fig.add_axes([0.20, 0.05, 0.1, 0.075])
+
+        bzero = Button(axzero, 'Init')
+        bzero.on_clicked(callback.zero)
+
+        bmidp = Button(axmidp, 'Mid')
+        bmidp.on_clicked(callback.mid)
+
         bnext = Button(axnext, 'Next')
         bnext.on_clicked(callback.next)
-        bprev = Button(axprev, 'Prev')
-        bprev.on_clicked(callback.prev)
 
-        plt.show()
-        
-    def plot_psi_sheet(self) -> None:
-        """
-        Plot evolution of phi in whole current sheet
-        """
-        if not hasattr(self, 't'):
-            raise Exception('Required attributes absent. Use run() first.')
-        Niter = self.t.shape[0]
-
-        psi_0 = self.psi_0
-        psi_hist = self.psi_hist
-        X, Y = self.X, self.Y
-        t = self.t
-
-        fig, ax = plt.subplots()
-        fig.subplots_adjust(bottom=0.2)
-        psi = bc.bc_psi_const(psi_hist[:, :, 0], psi_0)
-
-        ax.contourf(self.X,self.Y,psi,20,cmap=plt.get_cmap('coolwarm'))
-        ax.contour(self.X,self.Y,psi,20,colors='k',alpha=0.2)
-        ax.set_title('t = %0.3f' % self.t[0])
-
-        class Index():
-            ind = 0
-
-            def next(self, event):
-                self.ind += 1
-                i = self.ind % Niter
-                ax.cla()
-                psi = bc.bc_psi_const(psi_hist[:, :, i], psi_0)
-                ax.contourf(X,Y,psi,20,cmap=plt.get_cmap('coolwarm'))
-                ax.contour(X,Y,psi,20,colors='k',alpha=0.2)
-                ax.set_title('t = %0.3f' % t[i])
-                plt.draw()
-
-            def prev(self, event):
-                self.ind -= 1
-                i = self.ind % Niter
-                ax.cla()
-                psi = bc.bc_psi_const(psi_hist[:, :, i], psi_0)
-
-                ax.contourf(X,Y,psi,20,cmap=plt.get_cmap('coolwarm'))
-                ax.contour(X,Y,psi,20,colors='k',alpha=0.2)
-                ax.set_title('t = %0.3f' % t[i])
-                plt.draw()
-
-        callback = Index()
-        axprev = fig.add_axes([0.7, 0.05, 0.1, 0.075])
-        axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
-        bnext = Button(axnext, 'Next')
-        bnext.on_clicked(callback.next)
         bprev = Button(axprev, 'Prev')
         bprev.on_clicked(callback.prev)
 

@@ -1,5 +1,7 @@
 import reconnection as r
 import numpy as np
+import matplotlib.pyplot as plt
+
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -16,13 +18,14 @@ test = r.Reconnection(psi_0, j_0, eta, nu)
 
 # ---------------------------
 
-Niter = 5000
+Niter = 500
 dt = 1e-1
-
-test.run(Niter, 1e-2)
 
 # ---------------------------
 
-test.plot_psi_center()
-test.plot_phi_sheet()
-test.plot_psi_sheet()
+test.run(Niter, dt)
+test.plot_dpsi_center()
+test.plot_sheet()
+print(test.linfit_dpsi_center())
+
+
