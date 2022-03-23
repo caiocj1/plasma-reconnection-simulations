@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import scipy.stats
 import time
+from datetime import datetime
 import numpy as np
 import calc
 import bc
@@ -34,6 +35,9 @@ class Reconnection:
 
     @staticmethod
     def std_input(nx: int, ny: int) -> np.ndarray:
+        if nx % 2 != 0 or ny % 2 != 0:
+            raise Exception('Even resolution required in both directions')
+
         k = 10.0
         x = np.linspace(-1, 1, nx + 2)
         y = np.linspace(-1, 1, ny + 2)
@@ -43,7 +47,7 @@ class Reconnection:
         psi_0 = np.log(np.cosh(k*Y))/k
         j_0 = k/np.cosh(k*Y)**2
         
-        return psi_0, j_0
+        return psi_0, j_0, 1e-3, 1e-4
 
     def F(self, X: np.ndarray) -> np.ndarray:
         """
@@ -127,6 +131,18 @@ class Reconnection:
 
     # ----- Displaying results, post-treatment methods ----- #
 
+    def dpsi_center(self) -> np.ndarray:
+        """
+        Evolution of psi in center of current sheet
+        """
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+        Niter = self.t.shape[0]
+        dpsi = np.zeros(Niter)
+        for i in range(Niter):
+            dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
+        return(dpsi)
+
     def plot_dpsi_center(self) -> None:
         """
         Plot evolution of psi in center of current sheet
@@ -143,36 +159,48 @@ class Reconnection:
         ax = plt.axes()
         ax.cla()
         ax.set_xlabel('t')
-        ax.set_ylabel('$\log \Delta \psi$')
+        ax.set_ylabel('$\Delta \psi$')
         plt.semilogy(self.t, np.abs(dpsi), lw=2)
-        plt.savefig(f'results/{self.nx}x{self.ny}_eta{self.eta}_nu{self.nu}_{Niter}_dt{dt}.png')
+        plt.savefig(f'results/img/{self.nx}x{self.ny}_eta{self.eta}_nu{self.nu}_{Niter}_dt{dt}.png')
+        plt.show()
 
-    def linfit_dpsi_center(self) -> float:
+    def linfit_dpsi_center(self, start: float, end: float) -> float:
+        """
+        Calculates linear slope between start and end points
+        Prints slope and std error to text file
+        Supposed to be used after plotting to see adequate inputs
+        @return : slope of linear regression
+        """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
+
+        if start < self.t[0] or end > self.t[len(self.t) - 1]:
+            raise Exception('Start or end time out of bounds.')
+
         Niter = self.t.shape[0]
+        dt = self.t[1] - self.t[0]
+
+        start_idx = (int) (start / dt)
+        end_idx = (int) (end / dt)
+
         dpsi = np.zeros(Niter)
         for i in range(Niter):
             dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
 
-        divs = 8
-        res = []
-        for i in range(divs):
-            slope, intercept, r, p, se = scipy.stats.linregress(self.t[(i*Niter//divs):((i+1)*Niter//divs)], np.log10(dpsi)[(i*Niter//divs):((i+1)*Niter//divs)])
-            res.append((slope, se))
+        slope, intercept, r, p, se = scipy.stats.linregress(self.t[start_idx:end_idx], np.log10(dpsi)[start_idx:end_idx])
 
-        slp = 0
-        count = 0
-        for pair in res:
-            if pair[1] < 1e-4:
-                slp += pair[0]
-                count += 1
+        with open('results/results.txt', 'a') as f:
+            print(f'{self.nx}x{self.ny}, eta = {self.eta}, nu = {self.nu}, {Niter} iterations, dt = {dt}', file=f)
+            print('Slope log10:', slope, file=f)
+            print('Std error:', se, file=f)
+            print('\n', file=f)
 
-        return slp/count
+        return slope
         
     def plot_sheet(self) -> None:
         """
         Plot contour levels of phi and psi across current sheet
+        Has buttons for time control and to save specific instant
         """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
@@ -208,6 +236,10 @@ class Reconnection:
         class Index():
             ind = 0
 
+            def save(self, event):
+                now = datetime.today().strftime('%d_%m_%Y-%H_%M_%S')
+                plt.savefig(f'results/img/current_sheet_{now}.png')
+
             def zero(self, event):
                 self.ind = 0
                 update(0)
@@ -235,6 +267,7 @@ class Reconnection:
         axnext = fig.add_axes([0.81, 0.05, 0.1, 0.075])
         axmidp = fig.add_axes([0.09, 0.05, 0.1, 0.075])
         axzero = fig.add_axes([0.20, 0.05, 0.1, 0.075])
+        axsave = fig.add_axes([0.31, 0.05, 0.1, 0.075])
 
         bzero = Button(axzero, 'Init')
         bzero.on_clicked(callback.zero)
@@ -247,5 +280,8 @@ class Reconnection:
 
         bprev = Button(axprev, 'Prev')
         bprev.on_clicked(callback.prev)
+
+        bsave = Button(axsave, 'Save')
+        bsave.on_clicked(callback.save)
 
         plt.show()
