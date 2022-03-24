@@ -34,7 +34,7 @@ class Reconnection:
         self.Y, self.X = np.meshgrid(y,x)
 
     @staticmethod
-    def std_input(nx: int, ny: int) -> np.ndarray:
+    def std_input(nx: int, ny: int, eta: float = 1e-3, nu: float = 1e-4) -> tuple[np.ndarray, np.ndarray, float, float]:
         if nx % 2 != 0 or ny % 2 != 0:
             raise Exception('Even resolution required in both directions')
 
@@ -47,7 +47,7 @@ class Reconnection:
         psi_0 = np.log(np.cosh(k*Y))/k
         j_0 = k/np.cosh(k*Y)**2
         
-        return psi_0, j_0, 1e-3, 1e-4
+        return psi_0, j_0, eta, nu
 
     def F(self, X: np.ndarray) -> np.ndarray:
         """
@@ -130,6 +130,34 @@ class Reconnection:
         print('run() done, %0.3f' % (time.time() - start_time), 's')
 
     # ----- Displaying results, post-treatment methods ----- #
+
+    def plot_mag_field(self, inst) -> None:
+        """
+        Plots magnetic field in given instant along vertical axis
+        """
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+        Niter = self.t.shape[0]
+
+        # Gradient of psi
+        grad_psi = []
+        for i in range(Niter):
+            grad_psi.append(np.gradient(self.psi_hist[:,:,i]))
+
+        # Calculating magnetic field
+        mag_field = np.zeros((self.nx, self.ny, 2, Niter))
+        for i in range(Niter):
+            mag_field[:, :, 0, i] = grad_psi[i][1]
+            mag_field[:, :, 1, i] = - grad_psi[i][0]
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel('y')
+        ax.set_ylabel('B')
+
+        y = np.linspace(-1, 1, self.ny)
+
+        plt.plot(y, np.sqrt(mag_field[self.nx//2, :, 0, inst]**2 + mag_field[self.nx//2, :, 1, inst]**2))
+        plt.show()
 
     def dpsi_center(self) -> np.ndarray:
         """
