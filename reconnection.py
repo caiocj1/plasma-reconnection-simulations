@@ -133,11 +133,13 @@ class Reconnection:
 
     def plot_mag_field(self, inst) -> None:
         """
-        Plots magnetic field in given instant along vertical axis
+        Plots magnetic field in given instant along vertical axis, x = 0
         """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
         Niter = self.t.shape[0]
+        if inst == Niter:
+            inst -= 1
 
         # Gradient of psi
         grad_psi = []
@@ -157,6 +159,7 @@ class Reconnection:
         y = np.linspace(-1, 1, self.ny)
 
         plt.plot(y, np.sqrt(mag_field[self.nx//2, :, 0, inst]**2 + mag_field[self.nx//2, :, 1, inst]**2))
+        plt.savefig(f'results/img/mag_field_eta{self.eta}_N{inst}_{Niter}_dt{dt}.png')
         plt.show()
 
     def dpsi_center(self) -> np.ndarray:
@@ -167,8 +170,8 @@ class Reconnection:
             raise Exception('Required attributes absent. Use run() first.')
         Niter = self.t.shape[0]
         dpsi = np.zeros(Niter)
-        for i in range(Niter):
-            dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
+        dpsi[:] = self.psi_hist[self.nx//2, self.ny//2, :] - self.psi_0[self.nx//2, self.ny//2]
+
         return(dpsi)
 
     def plot_dpsi_center(self) -> None:
@@ -180,8 +183,8 @@ class Reconnection:
         Niter = self.t.shape[0]
         dt = self.t[1] - self.t[0]
         dpsi = np.zeros(Niter)
-        for i in range(Niter):
-            dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
+        dpsi[:] = self.psi_hist[self.nx//2, self.ny//2, :] - self.psi_0[self.nx//2, self.ny//2]
+
         plt.figure(1)
         plt.clf()
         ax = plt.axes()
@@ -212,8 +215,7 @@ class Reconnection:
         end_idx = (int) (end / dt)
 
         dpsi = np.zeros(Niter)
-        for i in range(Niter):
-            dpsi[i] = self.psi_hist[self.nx//2, self.ny//2, i] - self.psi_0[self.nx//2, self.ny//2]
+        dpsi[:] = self.psi_hist[self.nx//2, self.ny//2, :] - self.psi_0[self.nx//2, self.ny//2]
 
         slope, intercept, r, p, se = scipy.stats.linregress(self.t[start_idx:end_idx], np.log10(dpsi)[start_idx:end_idx])
 
@@ -224,6 +226,23 @@ class Reconnection:
             print('\n', file=f)
 
         return slope
+
+    def plot_deriv_dpsi_center(self) -> None:
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+
+        Niter = self.t.shape[0]
+        dt = self.t[1] - self.t[0]
+
+        dpsi = np.zeros(Niter)
+        dpsi[:] = self.psi_hist[self.nx//2, self.ny//2, :] - self.psi_0[self.nx//2, self.ny//2]
+
+        deriv_dpsi = np.diff(np.log10(dpsi)) / dt
+        t_diff = (self.t[:-1] + self.t[1:])/2
+
+        fig, ax = plt.subplots()
+        plt.plot(t_diff, deriv_dpsi)
+        plt.show()
         
     def plot_sheet(self) -> None:
         """
