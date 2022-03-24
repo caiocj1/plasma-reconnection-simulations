@@ -219,15 +219,18 @@ class Reconnection:
 
         slope, intercept, r, p, se = scipy.stats.linregress(self.t[start_idx:end_idx], np.log10(dpsi)[start_idx:end_idx])
 
-        with open('results/results.txt', 'a') as f:
+        with open('results/linfit_results.txt', 'a') as f:
             print(f'{self.nx}x{self.ny}, eta = {self.eta}, nu = {self.nu}, {Niter} iterations, dt = {dt}', file=f)
             print('Slope log10:', slope, file=f)
             print('Std error:', se, file=f)
-            print('\n', file=f)
+            print('', file=f)
 
         return slope
 
     def plot_deriv_dpsi_center(self) -> None:
+        """
+        Plot derivative of log10(dpsi) in time
+        """
         if not hasattr(self, 't'):
             raise Exception('Required attributes absent. Use run() first.')
 
