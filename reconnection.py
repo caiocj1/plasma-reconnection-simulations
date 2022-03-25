@@ -21,6 +21,8 @@ class Reconnection:
         """
         nx_large, ny_large = psi_0.shape
         self.nx, self.ny = nx_large - 2, ny_large - 2
+        if self.nx % 2 != 0 or self.ny % 2 != 0:
+            raise Exception('Even resolution required in both directions')
 
         self.eta = eta
         self.nu = nu
