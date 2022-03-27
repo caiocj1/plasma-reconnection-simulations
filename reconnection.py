@@ -133,15 +133,8 @@ class Reconnection:
 
     # ----- Displaying results, post-treatment methods ----- #
 
-    def plot_mag_field(self, inst) -> None:
-        """
-        Plots magnetic field in given instant along vertical axis, x = 0
-        """
-        if not hasattr(self, 't'):
-            raise Exception('Required attributes absent. Use run() first.')
+    def get_mag_field(self) -> None:
         Niter = self.t.shape[0]
-        if inst == Niter:
-            inst -= 1
 
         # Gradient of psi
         grad_psi = []
@@ -149,10 +142,29 @@ class Reconnection:
             grad_psi.append(np.gradient(self.psi_hist[:,:,i]))
 
         # Calculating magnetic field
-        mag_field = np.zeros((self.nx, self.ny, 2, Niter))
+        self.mag_field = np.zeros((self.nx, self.ny, 2, Niter))
         for i in range(Niter):
-            mag_field[:, :, 0, i] = grad_psi[i][1]
-            mag_field[:, :, 1, i] = - grad_psi[i][0]
+            self.mag_field[:, :, 0, i] = grad_psi[i][1]
+            self.mag_field[:, :, 1, i] = - grad_psi[i][0]
+
+
+    def plot_mag_field(self, inst: int) -> None:
+        """
+        Plots magnetic field in given instant along vertical axis, x = 0
+        """
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+
+        Niter = self.t.shape[0]
+        dt = self.t[1] - self.t[0]
+        if inst == Niter:
+            inst -= 1
+        elif inst < 0 or inst > Niter:
+            raise Exception('Invalid instant given. Must be in range [0, Niter].')
+
+        if not hasattr(self, 'mag_field'):
+            self.get_mag_field()
+        mag_field = self.mag_field
 
         fig, ax = plt.subplots()
         ax.set_xlabel('y')
@@ -163,6 +175,32 @@ class Reconnection:
         plt.plot(y, np.sqrt(mag_field[self.nx//2, :, 0, inst]**2 + mag_field[self.nx//2, :, 1, inst]**2))
         plt.savefig(f'results/img/mag_field_eta{self.eta}_N{inst}_{Niter}_dt{dt}.png')
         plt.show()
+
+    def sheet_size(self, inst: int) -> float:
+        if not hasattr(self, 't'):
+            raise Exception('Required attributes absent. Use run() first.')
+
+        Niter = self.t.shape[0]
+        if inst == Niter:
+            inst -= 1
+        elif inst < 0 or inst > Niter:
+            raise Exception('Invalid instant given. Must be in range [0, Niter].')
+
+        if not hasattr(self, 'mag_field'):
+            self.get_mag_field()
+        mag_field = self.mag_field
+
+        norm_b = np.sqrt(mag_field[self.nx//2, :, 0, inst]**2 + mag_field[self.nx//2, :, 1, inst]**2)
+        max_b, min_b = np.max(norm_b), np.min(norm_b)
+        cut_b = (max_b + min_b)/2
+
+        res = []
+        for i in range(self.ny):
+            if np.abs(norm_b[i] - cut_b) < cut_b/100:
+                res.append(i)
+
+        x = np.linspace(-1, 1, self.nx)
+        return (x[max(res)] - x[min(res)])
 
     def dpsi_center(self) -> np.ndarray:
         """
